@@ -1,0 +1,49 @@
+name: BanCheck
+
+on:
+  workflow_dispatch:
+    inputs:
+      uid:
+        description: 'UID do jogador (ex: 1234567890)'
+        required: true
+      key:
+        description: 'API key (padrão: saeed)'
+        required: false
+        default: 'saeed'
+
+jobs:
+  bancheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (opcional)
+        uses: actions/checkout@v4
+
+      - name: Call BanCheck API
+        id: call
+        env:
+          UID: ${{ github.event.inputs.uid }}
+          KEY: ${{ github.event.inputs.key || 'saeed' }}
+        run: |
+          echo "Chamando API para UID=${UID} com key=${KEY}"
+          TARGET="https://bancheck.tsunstudio.pw/bancheck?key=${KEY}&uid=${UID}"
+          echo "Endpoint: $TARGET"
+          # Faz a requisição e guarda como result.json
+          curl -sS "$TARGET" -o result.json || ( echo "curl falhou"; exit 1 )
+          echo "::group::Resposta bruta (result.json)"
+          cat result.json
+          echo "::endgroup::"
+          # mostre também uma versão truncada para preview
+          echo "Preview (primeiras 200 linhas):"
+          head -n 200 result.json || true
+
+      - name: Upload result as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bancheck-result-${{ github.run_id }}
+          path: result.json
+
+      - name: Create output (for further steps)
+        run: |
+          echo "response<<EOF" >> $GITHUB_OUTPUT
+          cat result.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
